@@ -25,7 +25,7 @@ pipeline {
         }
     }
 
-    agent { docker { image 'php' } }
+    agent { docker { image 'yutaka-testrepo' } }
     stages {
         stage('build') {
             steps {
