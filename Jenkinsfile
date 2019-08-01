@@ -24,13 +24,4 @@ pipeline {
             }
         }
     }
-
-    agent { docker { image 'yutaka-testrepo' } }
-    stages {
-        stage('build') {
-            steps {
-                sh 'php --version'
-            }
-        }
-    }
 }
