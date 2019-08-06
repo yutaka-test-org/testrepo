@@ -1,11 +1,16 @@
-From image-builder:latest
-RUN set -x && apt update && apt install -y nginx && \
-    ln -sf /dev/stdout /var/log/nginx/access.log && \
-    ln -sf /dev/stderr /var/log/nginx/error.log
+From FROM ubuntu:bionic
+
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN rm /bin/sh && ln -s /bin/bash /bin/sh
+
 RUN apt-get update && apt-get install --no-install-recommends --no-install-suggests -y \
     build-essential \
     software-properties-common \
     git \
+    mysql-client \
+    redis-tools \
     libmysqld-dev \
     libsqlite3-dev \
     libxml2-dev \
@@ -16,43 +21,57 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
     libmecab-dev \
     mecab-ipadic-utf8 \
     python3-pip \
-    supervisor
+    libyaml-dev \
+    python3-dev \
+    supervisor \
+    openssh-client \
+    libssl-dev \
+    curl \
+    python3-setuptools \
+    file
 
+
+RUN apt-get install -y tzdata && \
+    ln -sf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
+
+# ruby
 RUN add-apt-repository -y ppa:brightbox/ruby-ng && \
     add-apt-repository -y ppa:nginx/stable && \
     apt-get update && apt-get install --no-install-recommends --no-install-suggests -y \
-    ruby \
-    ruby-dev \
-    nginx && \
-    rm -rf /var/lib/apt/lists/*
+    ruby2.5 \
+    ruby2.5-dev \
+    nginx
 
+# gem
 RUN gem install rubygems-update --no-document && \
     update_rubygems && \
     gem install bundler --no-document
 
-RUN pip install awscli
+# awscli
+RUN pip3 install awscli && \
+    rm -rf /var/lib/apt/lists/*
 
-WORKDIR /tmp
-ADD ./Gemfile Gemfile
-ADD ./Gemfile.lock Gemfile.lock
-RUN NOKOGIRI_USE_SYSTEM_LIBRARIES=YES bundle install
+# node
+ENV NVM_DIR /usr/local/nvm
+ENV NODE_VERSION v7.2.0
 
-ADD . /var/source/app
-WORKDIR /var/source/app
-RUN mkdir -p /var/log/luccy \
-             /var/run/unicorn \
-             /var/log/unicorn/debug \
-             /var/log/unicorn/error
+RUN curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.25.4/install.sh | bash \
+    && source $NVM_DIR/nvm.sh \
+    && nvm install $NODE_VERSION \
+    && nvm alias default $NODE_VERSION \
+    && nvm use default
 
-COPY container/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY container/nginx/nginx.conf.erb /etc/nginx/
-COPY container/nginx/luccy.conf.erb /etc/nginx/sites-available/luccy.conf.erb
-COPY container/nginx/log-format.conf /etc/nginx/conf.d/
-COPY container/nginx/server-status.conf /etc/nginx/conf.d/
-COPY container/www/logrotate /etc/logrotate.d/www
+ENV NODE_PATH $NVM_DIR/versions/node/$NODE_VERSION/lib/node_modules
+ENV PATH      $NVM_DIR/versions/node/$NODE_VERSION/bin:$PATH
 
-ARG target
-RUN bash -e container/onbuild.sh ${target}
+# mysql-client
+COPY container/mysql/aumo.cnf /etc/mysql/conf.d
+
+
+# nginx
+RUN set -x && apt update && apt install -y nginx && \
+    ln -sf /dev/stdout /var/log/nginx/access.log && \
+    ln -sf /dev/stderr /var/log/nginx/error.log
 
 RUN apt-get autoremove -y
 
